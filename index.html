@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenCode 配置管理器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+            margin: 0;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .main-layout {
+            display: flex;
+            gap: 30px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .left-panel {
+            flex: 0 0 450px;
+        }
+        .right-panel {
+            flex: 1;
+            min-width: 0;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+            padding: 30px;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 20px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 0;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+        }
+        input, select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        input:focus, select:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 500;
+        }
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #0056b3;
+        }
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        .btn-success:hover {
+            background: #218838;
+        }
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+            margin-left: 10px;
+        }
+        .btn-danger:hover {
+            background: #c82333;
+        }
+        .providers-list {
+            margin-top: 0;
+        }
+        .provider-card {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+            background: #fafafa;
+        }
+        .provider-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .provider-name {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+        }
+        .provider-info {
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 8px;
+        }
+        .models-badge {
+            display: inline-block;
+            background: #007bff;
+            color: white;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+        .message {
+            padding: 12px 16px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .message.show {
+            display: block;
+        }
+        .loading {
+            display: none;
+            color: #666;
+            margin-top: 10px;
+        }
+        .loading.show {
+            display: block;
+        }
+        .button-group {
+            margin-top: 20px;
+        }
+        .models-selection {
+            display: none;
+            margin-top: 25px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+        }
+        .models-selection.show {
+            display: block;
+        }
+        .models-selection h3 {
+            margin-bottom: 15px;
+            color: #333;
+            font-size: 16px;
+        }
+        .model-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            margin-bottom: 8px;
+            background: white;
+            border-radius: 6px;
+            border: 1px solid #e0e0e0;
+            transition: background 0.2s;
+        }
+        .model-item:hover {
+            background: #f8f9fa;
+        }
+        .model-item input[type="checkbox"] {
+            width: auto;
+            margin-right: 12px;
+            cursor: pointer;
+        }
+        .model-item label {
+            margin: 0;
+            cursor: pointer;
+            flex: 1;
+            font-weight: normal;
+        }
+        .select-all-btn {
+            font-size: 12px;
+            padding: 6px 12px;
+            margin-bottom: 10px;
+        }
+        @media (max-width: 1024px) {
+            .main-layout {
+                flex-direction: column;
+            }
+            .left-panel {
+                flex: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🛠️ OpenCode 配置管理器</h1>
+        <p class="subtitle">轻松管理你的 AI Provider 配置</p>
+    </div>
+
+    <div id="message" class="message"></div>
+
+    <div class="main-layout">
+        <!-- 左侧：表单区域 -->
+        <div class="left-panel">
+            <div class="container">
+                <h2>添加/编辑 Provider</h2>
+                <form id="providerForm">
+            <div class="form-group">
+                <label for="providerId">Provider ID *</label>
+                <input type="text" id="providerId" placeholder="例如: my_provider" required>
+            </div>
+
+            <div class="form-group">
+                <label for="providerName">显示名称（可选，默认使用 Provider ID）</label>
+                <input type="text" id="providerName" placeholder="留空则使用 Provider ID">
+            </div>
+
+            <div class="form-group">
+                <label for="baseURL">Base URL *</label>
+                <input type="url" id="baseURL" placeholder="例如: https://api.example.com/v1" required>
+            </div>
+
+            <div class="form-group">
+                <label for="apiKey">API Key *</label>
+                <input type="text" id="apiKey" placeholder="你的 API Key" required>
+            </div>
+
+            <div class="button-group">
+                <button type="button" class="btn btn-primary" onclick="discoverModels()">🔍 自动探查模型</button>
+                <button type="button" class="btn btn-secondary" onclick="showManualInput()">✏️ 手动添加模型</button>
+                <button type="submit" class="btn btn-success">💾 保存配置</button>
+                <button type="button" class="btn btn-secondary" onclick="resetForm()">🔄 重置表单</button>
+            </div>
+
+            <div id="loading" class="loading">⏳ 正在探查模型...</div>
+
+            <div id="manualInput" class="models-selection">
+                <h3>✏️ 手动输入模型</h3>
+                <p style="font-size: 13px; color: #666; margin-bottom: 10px;">每行一个模型 ID，例如：gpt-4、claude-3-opus</p>
+                <textarea id="manualModels" rows="6" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-family: monospace; font-size: 13px;" placeholder="gpt-4&#10;claude-3-opus&#10;gemini-pro"></textarea>
+                <button type="button" class="btn btn-primary" onclick="addManualModels()" style="margin-top: 10px;">添加模型</button>
+            </div>
+
+            <div id="modelsSelection" class="models-selection">
+                <h3>🎯 选择要添加的模型</h3>
+                <button type="button" class="btn btn-secondary select-all-btn" onclick="toggleSelectAll()">全选/取消全选</button>
+                <div id="modelsList"></div>
+            </div>
+
+            <input type="hidden" id="discoveredModels" value="{}">
+        </form>
+            </div>
+        </div>
+
+        <!-- 右侧：Providers 列表 -->
+        <div class="right-panel">
+            <div class="container">
+                <h2>📋 当前配置的 Providers</h2>
+                <div id="providersList"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let config = {};
+
+        // 加载配置
+        async function loadConfig() {
+            try {
+                const response = await fetch('/api/config');
+                config = await response.json();
+                renderProviders();
+            } catch (error) {
+                showMessage('加载配置失败: ' + error.message, 'error');
+            }
+        }
+
+        // 渲染 Providers 列表
+        function renderProviders() {
+            const list = document.getElementById('providersList');
+            const providers = config.provider || {};
+
+            if (Object.keys(providers).length === 0) {
+                list.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">暂无配置的 Provider</p>';
+                return;
+            }
+
+            list.innerHTML = Object.entries(providers).map(([id, provider]) => {
+                const modelCount = Object.keys(provider.models || {}).length;
+                const modelNames = Object.keys(provider.models || {}).join(', ');
+
+                return `
+                    <div class="provider-card">
+                        <div class="provider-header">
+                            <div>
+                                <span class="provider-name">${provider.name}</span>
+                                <span class="models-badge">${modelCount} 个模型</span>
+                            </div>
+                            <div>
+                                <button class="btn btn-secondary" onclick="editProvider('${id}')">✏️ 编辑</button>
+                                <button class="btn btn-danger" onclick="deleteProvider('${id}')">🗑️ 删除</button>
+                            </div>
+                        </div>
+                        <div class="provider-info"><strong>ID:</strong> ${id}</div>
+                        <div class="provider-info"><strong>Base URL:</strong> ${provider.options.baseURL}</div>
+                        <div class="provider-info"><strong>API Key:</strong> ${provider.options.apiKey.substring(0, 20)}...</div>
+                        ${modelCount > 0 ? `<div class="provider-info"><strong>模型:</strong> ${modelNames}</div>` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 显示手动输入区域
+        function showManualInput() {
+            const manualInput = document.getElementById('manualInput');
+            const modelsSelection = document.getElementById('modelsSelection');
+
+            modelsSelection.classList.remove('show');
+            manualInput.classList.add('show');
+        }
+
+        // 添加手动输入的模型
+        function addManualModels() {
+            const textarea = document.getElementById('manualModels');
+            const modelIds = textarea.value
+                .split('\n')
+                .map(line => line.trim())
+                .filter(line => line.length > 0);
+
+            if (modelIds.length === 0) {
+                showMessage('请至少输入一个模型 ID', 'error');
+                return;
+            }
+
+            const models = {};
+            modelIds.forEach(id => {
+                models[id] = { name: id };
+            });
+
+            renderModelsSelection(models);
+            document.getElementById('manualInput').classList.remove('show');
+            showMessage(`已添加 ${modelIds.length} 个模型，请选择需要的模型`, 'success');
+        }
+
+        // 自动探查模型
+        async function discoverModels() {
+            const baseURL = document.getElementById('baseURL').value;
+            const apiKey = document.getElementById('apiKey').value;
+
+            if (!baseURL || !apiKey) {
+                showMessage('请先填写 Base URL 和 API Key', 'error');
+                return;
+            }
+
+            const loading = document.getElementById('loading');
+            const modelsSelection = document.getElementById('modelsSelection');
+            const manualInput = document.getElementById('manualInput');
+            loading.classList.add('show');
+            modelsSelection.classList.remove('show');
+            manualInput.classList.remove('show');
+
+            try {
+                const response = await fetch('/api/discover-models', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ baseURL, apiKey })
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    showMessage('探查失败: ' + data.error + '。你可以使用"手动添加模型"功能', 'error');
+                } else {
+                    renderModelsSelection(data.models);
+                    showMessage(`成功探查到 ${Object.keys(data.models).length} 个模型！请选择要添加的模型`, 'success');
+                }
+            } catch (error) {
+                showMessage('探查失败: ' + error.message + '。你可以使用"手动添加模型"功能', 'error');
+            } finally {
+                loading.classList.remove('show');
+            }
+        }
+
+        // 渲染模型选择列表
+        function renderModelsSelection(models) {
+            const modelsList = document.getElementById('modelsList');
+            const modelsSelection = document.getElementById('modelsSelection');
+
+            if (Object.keys(models).length === 0) {
+                modelsSelection.classList.remove('show');
+                return;
+            }
+
+            modelsList.innerHTML = Object.entries(models).map(([id, model]) => `
+                <div class="model-item">
+                    <input type="checkbox" id="model_${id}" value="${id}" checked onchange="updateSelectedModels()">
+                    <label for="model_${id}">${model.name || id}</label>
+                </div>
+            `).join('');
+
+            modelsSelection.classList.add('show');
+            updateSelectedModels();
+        }
+
+        // 更新选中的模型
+        function updateSelectedModels() {
+            const checkboxes = document.querySelectorAll('#modelsList input[type="checkbox"]');
+            const selectedModels = {};
+
+            checkboxes.forEach(checkbox => {
+                if (checkbox.checked) {
+                    const modelId = checkbox.value;
+                    selectedModels[modelId] = {
+                        name: modelId
+                    };
+                }
+            });
+
+            document.getElementById('discoveredModels').value = JSON.stringify(selectedModels);
+        }
+
+        // 全选/取消全选
+        function toggleSelectAll() {
+            const checkboxes = document.querySelectorAll('#modelsList input[type="checkbox"]');
+            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = !allChecked;
+            });
+
+            updateSelectedModels();
+        }
+
+        // 保存配置
+        document.getElementById('providerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const providerId = document.getElementById('providerId').value;
+            const providerName = document.getElementById('providerName').value || providerId; // 如果不填，使用 providerId
+            const baseURL = document.getElementById('baseURL').value;
+            const apiKey = document.getElementById('apiKey').value;
+            const modelsStr = document.getElementById('discoveredModels').value;
+
+            const models = modelsStr ? JSON.parse(modelsStr) : {};
+
+            const providerConfig = {
+                npm: '@ai-sdk/openai-compatible',
+                name: providerName,
+                options: { baseURL, apiKey },
+                models
+            };
+
+            try {
+                const response = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ providerId, config: providerConfig })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showMessage('配置保存成功！', 'success');
+                    resetForm();
+                    loadConfig();
+                } else {
+                    showMessage('保存失败: ' + result.error, 'error');
+                }
+            } catch (error) {
+                showMessage('保存失败: ' + error.message, 'error');
+            }
+        });
+
+        // 编辑 Provider
+        function editProvider(id) {
+            const provider = config.provider[id];
+            document.getElementById('providerId').value = id;
+            document.getElementById('providerName').value = provider.name;
+            document.getElementById('baseURL').value = provider.options.baseURL;
+            document.getElementById('apiKey').value = provider.options.apiKey;
+
+            // 显示已有的模型
+            if (provider.models && Object.keys(provider.models).length > 0) {
+                renderModelsSelection(provider.models);
+            }
+
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            showMessage('正在编辑 ' + provider.name, 'success');
+        }
+
+        // 删除 Provider
+        async function deleteProvider(id) {
+            if (!confirm(`确定要删除 "${config.provider[id].name}" 吗？`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/config/' + id, {
+                    method: 'DELETE'
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showMessage('删除成功！', 'success');
+                    loadConfig();
+                } else {
+                    showMessage('删除失败: ' + result.error, 'error');
+                }
+            } catch (error) {
+                showMessage('删除失败: ' + error.message, 'error');
+            }
+        }
+
+        // 重置表单
+        function resetForm() {
+            document.getElementById('providerForm').reset();
+            document.getElementById('discoveredModels').value = '{}';
+            document.getElementById('modelsSelection').classList.remove('show');
+            document.getElementById('manualInput').classList.remove('show');
+            document.getElementById('manualModels').value = '';
+        }
+
+        // 显示消息
+        function showMessage(text, type) {
+            const msg = document.getElementById('message');
+            msg.textContent = text;
+            msg.className = 'message ' + type + ' show';
+            setTimeout(() => msg.classList.remove('show'), 5000);
+        }
+
+        // 页面加载时加载配置
+        loadConfig();
+    </script>
+</body>
+</html>
