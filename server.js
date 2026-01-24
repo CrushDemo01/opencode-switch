@@ -147,6 +147,176 @@ async function discoverModels(baseURL, apiKey) {
     });
 }
 
+// 测试模型连接
+async function testModelConnection(baseURL, apiKey, modelId) {
+    // 参数验证
+    if (!baseURL || typeof baseURL !== 'string') {
+        return { success: false, error: '缺少有效的 Base URL', model: modelId };
+    }
+    if (!apiKey || typeof apiKey !== 'string') {
+        return { success: false, error: '缺少有效的 API Key', model: modelId };
+    }
+    if (!modelId || typeof modelId !== 'string') {
+        return { success: false, error: '缺少有效的模型 ID', model: modelId };
+    }
+
+    log('INFO', '开始测试模型连接', { baseURL, modelId });
+
+    return new Promise((resolve, reject) => {
+        // 确保 URL 格式正确
+        let normalizedURL = baseURL.trim();
+        // 移除末尾斜杠
+        if (normalizedURL.endsWith('/')) {
+            normalizedURL = normalizedURL.slice(0, -1);
+        }
+
+        // 检查是否已经包含 /v1 或其他版本路径
+        const hasVersionPath = /\/v\d+$/.test(normalizedURL) || normalizedURL.endsWith('/chat/completions');
+
+        // 构建完整 URL
+        let url;
+        if (normalizedURL.endsWith('/chat/completions')) {
+            url = normalizedURL;
+        } else if (hasVersionPath) {
+            url = normalizedURL + '/chat/completions';
+        } else {
+            // 如果没有版本路径，添加 /v1
+            url = normalizedURL + '/v1/chat/completions';
+        }
+
+        // 处理 http 和 https
+        const client = url.startsWith('https') ? https : http;
+
+        const payload = JSON.stringify({
+            model: modelId,
+            messages: [{ role: 'user', content: 'Hi' }],
+            max_tokens: 10
+        });
+
+        const options = {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(payload)
+            }
+        };
+
+        log('INFO', '发送测试请求', { url });
+
+        const startTime = Date.now();
+
+        const req = client.request(url, options, (res) => {
+            let data = '';
+
+            res.on('data', (chunk) => {
+                data += chunk;
+            });
+
+            res.on('end', () => {
+                const endTime = Date.now();
+                const latency = endTime - startTime;
+
+                try {
+                    log('INFO', '测试响应', {
+                        statusCode: res.statusCode,
+                        latency,
+                        dataPreview: data.substring(0, 200)
+                    });
+
+                    if (res.statusCode !== 200) {
+                        const error = `API 返回错误状态码: ${res.statusCode}`;
+                        log('ERROR', error, { fullResponse: data });
+                        resolve({
+                            success: false,
+                            error: error,
+                            model: modelId,
+                            latency
+                        });
+                        return;
+                    }
+
+                    const parsed = JSON.parse(data);
+
+                    // 尝试从多种响应格式中提取内容
+                    let content = null;
+                    if (parsed.choices && parsed.choices.length > 0) {
+                        const choice = parsed.choices[0];
+                        // 标准 OpenAI 格式
+                        content = choice.message?.content
+                            // 某些 API 使用 text 字段
+                            || choice.text
+                            // 流式响应格式
+                            || choice.delta?.content
+                            // 如果有 message 但没有 content，尝试其他字段
+                            || (choice.message && JSON.stringify(choice.message));
+                    }
+
+                    // 如果还是没有内容，尝试其他常见格式
+                    if (!content && parsed.response) {
+                        content = parsed.response;
+                    }
+                    if (!content && parsed.output) {
+                        content = parsed.output;
+                    }
+                    if (!content && parsed.result) {
+                        content = parsed.result;
+                    }
+
+                    // 简单的验证响应格式
+                    if (parsed.choices && parsed.choices.length > 0) {
+                        resolve({
+                            success: true,
+                            message: content || '连接成功 (API 未返回文本内容)',
+                            model: modelId,
+                            latency,
+                            raw: data.substring(0, 500) // 返回原始响应用于调试
+                        });
+                    } else if (content) {
+                        // 非标准格式但有内容
+                        resolve({
+                            success: true,
+                            message: content,
+                            model: modelId,
+                            latency
+                        });
+                    } else {
+                        resolve({
+                            success: false,
+                            error: 'API 返回格式不符合预期: 缺少 choices 字段',
+                            model: modelId,
+                            latency,
+                            raw: data.substring(0, 500)
+                        });
+                    }
+                } catch (error) {
+                    resolve({
+                        success: false,
+                        error: '解析响应失败: ' + error.message,
+                        model: modelId,
+                        latency
+                    });
+                }
+            });
+        });
+
+        req.on('error', (error) => {
+            const endTime = Date.now();
+            const latency = endTime - startTime;
+            log('ERROR', '测试请求失败', { error: error.message });
+            resolve({
+                success: false,
+                error: '请求失败: ' + error.message,
+                model: modelId,
+                latency
+            });
+        });
+
+        req.write(payload);
+        req.end();
+    });
+}
+
 // 创建 HTTP 服务器
 const server = http.createServer(async (req, res) => {
     // CORS 支持
@@ -245,6 +415,25 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
+    // 测试模型连接
+    if (req.url === '/api/test-model' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', async () => {
+            try {
+                const { baseURL, apiKey, modelId } = JSON.parse(body);
+                const result = await testModelConnection(baseURL, apiKey, modelId);
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify(result));
+            } catch (error) {
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: false, error: '请求解析失败: ' + error.message }));
+            }
+        });
+        return;
+    }
+
     // 404
     res.writeHead(404, { 'Content-Type': 'text/plain' });
     res.end('Not Found');
@@ -264,6 +453,7 @@ server.listen(PORT, () => {
 ✨ 功能:
    • 可视化管理 Provider 配置
    • 自动探查可用模型列表
+   • 测试模型连接状态
    • 支持添加、编辑、删除操作
    • 详细日志记录
 

@@ -222,6 +222,116 @@
             padding: 6px 12px;
             margin-bottom: 10px;
         }
+        .message.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        /* 模态框样式 */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            width: 90%;
+            max-width: 500px;
+            max-height: 80vh;
+            overflow: hidden;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            border-bottom: 1px solid #e0e0e0;
+            background: #f8f9fa;
+        }
+        .modal-header h3 {
+            margin: 0;
+            color: #333;
+        }
+        .close-btn {
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+            transition: color 0.2s;
+        }
+        .close-btn:hover {
+            color: #333;
+        }
+        .modal-body {
+            padding: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .modal-footer {
+            padding: 15px 20px;
+            border-top: 1px solid #e0e0e0;
+            text-align: right;
+            background: #f8f9fa;
+        }
+        .test-result-item {
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+        .test-result-item.success {
+            background: #d4edda;
+            border-color: #c3e6cb;
+        }
+        .test-result-item.error {
+            background: #f8d7da;
+            border-color: #f5c6cb;
+        }
+        .test-result-item .model-name {
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        .test-result-item .result-message {
+            font-size: 13px;
+            color: #555;
+            word-break: break-word;
+        }
+        .test-result-item .latency {
+            font-size: 12px;
+            color: #888;
+            margin-top: 5px;
+        }
+        .test-progress {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #6f42c1;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
         @media (max-width: 1024px) {
             .main-layout {
                 flex-direction: column;
@@ -239,6 +349,23 @@
     </div>
 
     <div id="message" class="message"></div>
+
+    <!-- 测试结果模态框 -->
+    <div id="testModal" class="modal" onclick="if(event.target===this)closeTestModal()">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>⚡ 模型连接测试</h3>
+                <span class="close-btn" onclick="closeTestModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div id="testProgress" class="test-progress">准备开始测试...</div>
+                <div id="testResults" class="test-results"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeTestModal()">关闭</button>
+            </div>
+        </div>
+    </div>
 
     <div class="main-layout">
         <!-- 左侧：表单区域 -->
@@ -269,6 +396,7 @@
             <div class="button-group">
                 <button type="button" class="btn btn-primary" onclick="discoverModels()">🔍 自动探查模型</button>
                 <button type="button" class="btn btn-secondary" onclick="showManualInput()">✏️ 手动添加模型</button>
+                <button type="button" class="btn btn-secondary" style="background-color: #6f42c1;" onclick="testCurrentForm()">⚡ 测试连接</button>
                 <button type="submit" class="btn btn-success">💾 保存配置</button>
                 <button type="button" class="btn btn-secondary" onclick="resetForm()">🔄 重置表单</button>
             </div>
@@ -338,6 +466,7 @@
                                 <span class="models-badge">${modelCount} 个模型</span>
                             </div>
                             <div>
+                                <button class="btn btn-secondary" style="background-color: #6f42c1;" onclick="testProviderModel('${id}')">⚡ 测试</button>
                                 <button class="btn btn-secondary" onclick="editProvider('${id}')">✏️ 编辑</button>
                                 <button class="btn btn-danger" onclick="deleteProvider('${id}')">🗑️ 删除</button>
                             </div>
@@ -349,6 +478,198 @@
                     </div>
                 `;
             }).join('');
+        }
+
+        // 测试 Provider 的所有模型
+        async function testProviderModel(id) {
+            const provider = config.provider[id];
+            if (!provider || !provider.models) {
+                showMessage('Provider 配置不完整', 'error');
+                return;
+            }
+
+            const modelIds = Object.keys(provider.models);
+            if (modelIds.length === 0) {
+                showMessage('该 Provider 没有配置模型', 'error');
+                return;
+            }
+
+            // 显示模态框并开始测试
+            showTestModal();
+            updateTestProgress(`<span class="spinner"></span>准备测试 ${modelIds.length} 个模型...`);
+
+            const results = [];
+            let completed = 0;
+
+            // 并行测试所有模型
+            const testPromises = modelIds.map(async (modelId) => {
+                try {
+                    const response = await fetch('/api/test-model', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            baseURL: provider.options.baseURL,
+                            apiKey: provider.options.apiKey,
+                            modelId: modelId
+                        })
+                    });
+
+                    const result = await response.json();
+                    results.push(result);
+                    completed++;
+                    updateTestProgress(`<span class="spinner"></span>测试中... (${completed}/${modelIds.length})`);
+                    renderTestResults(results);
+                    return result;
+                } catch (error) {
+                    const result = {
+                        success: false,
+                        error: '请求失败: ' + error.message,
+                        model: modelId
+                    };
+                    results.push(result);
+                    completed++;
+                    updateTestProgress(`<span class="spinner"></span>测试中... (${completed}/${modelIds.length})`);
+                    renderTestResults(results);
+                    return result;
+                }
+            });
+
+            // 等待所有测试完成
+            await Promise.all(testPromises);
+
+            // 显示最终结果
+            const successCount = results.filter(r => r.success).length;
+            const failCount = results.length - successCount;
+            updateTestProgress(`✅ 测试完成: ${successCount} 成功, ${failCount} 失败`);
+
+            if (failCount === 0) {
+                showMessage(`全部 ${successCount} 个模型测试成功！`, 'success');
+            } else if (successCount === 0) {
+                showMessage(`全部 ${failCount} 个模型测试失败`, 'error');
+            } else {
+                showMessage(`${successCount} 个成功, ${failCount} 个失败`, 'info');
+            }
+        }
+
+        // 渲染多个测试结果
+        function renderTestResults(results) {
+            const resultsEl = document.getElementById('testResults');
+
+            // 按成功/失败排序，成功的在前
+            const sortedResults = [...results].sort((a, b) => {
+                if (a.success === b.success) return 0;
+                return a.success ? -1 : 1;
+            });
+
+            resultsEl.innerHTML = sortedResults.map(result => {
+                if (result.success) {
+                    return `
+                        <div class="test-result-item success">
+                            <div class="model-name">✅ ${escapeHtml(result.model)}</div>
+                            <div class="result-message"><strong>回复:</strong> ${escapeHtml(result.message)}</div>
+                            ${result.latency ? `<div class="latency">⏱️ ${result.latency}ms</div>` : ''}
+                        </div>
+                    `;
+                } else {
+                    return `
+                        <div class="test-result-item error">
+                            <div class="model-name">❌ ${escapeHtml(result.model || '未知模型')}</div>
+                            <div class="result-message"><strong>错误:</strong> ${escapeHtml(result.error)}</div>
+                            ${result.latency ? `<div class="latency">⏱️ ${result.latency}ms</div>` : ''}
+                            ${result.raw ? `<details><summary style="cursor:pointer;font-size:12px;color:#888;margin-top:5px;">查看原始响应</summary><pre style="font-size:11px;background:#f5f5f5;padding:8px;border-radius:4px;overflow-x:auto;margin-top:5px;">${escapeHtml(result.raw)}</pre></details>` : ''}
+                        </div>
+                    `;
+                }
+            }).join('');
+        }
+
+        // 测试当前表单配置
+        async function testCurrentForm() {
+            const baseURL = document.getElementById('baseURL').value.trim();
+            const apiKey = document.getElementById('apiKey').value.trim();
+
+            if (!baseURL || !apiKey) {
+                showMessage('请先填写 Base URL 和 API Key', 'error');
+                return;
+            }
+
+            // 获取当前选中的模型或尝试使用默认模型测试
+            const modelsStr = document.getElementById('discoveredModels').value;
+            let models = {};
+            try {
+                models = modelsStr ? JSON.parse(modelsStr) : {};
+            } catch (e) {
+                models = {};
+            }
+            let modelId = Object.keys(models)[0];
+
+            if (!modelId) {
+                // 如果没有选择模型，尝试请求用户输入或者使用通用默认值
+                modelId = prompt("请输入要测试的模型 ID (例如 gpt-3.5-turbo):", "gpt-3.5-turbo");
+                if (!modelId || !modelId.trim()) return;
+                modelId = modelId.trim();
+            }
+
+            // 显示模态框并开始测试
+            showTestModal();
+            updateTestProgress(`<span class="spinner"></span>正在测试模型 ${modelId}...`);
+
+            try {
+                const response = await fetch('/api/test-model', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ baseURL, apiKey, modelId })
+                });
+
+                const result = await response.json();
+                showTestResult(result);
+            } catch (error) {
+                showTestResult({
+                    success: false,
+                    error: '请求失败: ' + error.message,
+                    model: modelId
+                });
+            }
+        }
+
+        // 显示测试模态框
+        function showTestModal() {
+            document.getElementById('testModal').classList.add('show');
+            document.getElementById('testProgress').innerHTML = '准备开始测试...';
+            document.getElementById('testResults').innerHTML = '';
+        }
+
+        // 关闭测试模态框
+        function closeTestModal() {
+            document.getElementById('testModal').classList.remove('show');
+        }
+
+        // 更新测试进度
+        function updateTestProgress(html) {
+            document.getElementById('testProgress').innerHTML = html;
+        }
+
+        // 显示单个测试结果
+        function showTestResult(result) {
+            const progressEl = document.getElementById('testProgress');
+
+            if (result.success) {
+                progressEl.innerHTML = '✅ 测试完成';
+                showMessage('测试连接成功！', 'success');
+            } else {
+                progressEl.innerHTML = '❌ 测试失败';
+                showMessage('测试失败: ' + result.error, 'error');
+            }
+
+            renderTestResults([result]);
+        }
+
+        // HTML 转义函数，防止 XSS
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
 
         // 显示手动输入区域
@@ -482,7 +803,13 @@
             const apiKey = document.getElementById('apiKey').value;
             const modelsStr = document.getElementById('discoveredModels').value;
 
-            const models = modelsStr ? JSON.parse(modelsStr) : {};
+            let models = {};
+            try {
+                models = modelsStr ? JSON.parse(modelsStr) : {};
+            } catch (e) {
+                showMessage('模型数据解析失败', 'error');
+                return;
+            }
 
             const providerConfig = {
                 npm: '@ai-sdk/openai-compatible',
