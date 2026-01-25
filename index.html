@@ -417,6 +417,8 @@
             </div>
 
             <input type="hidden" id="discoveredModels" value="{}">
+            <input type="hidden" id="existingModels" value="{}">
+            <input type="hidden" id="isEditMode" value="false">
         </form>
             </div>
         </div>
@@ -802,6 +804,7 @@
             const baseURL = document.getElementById('baseURL').value;
             const apiKey = document.getElementById('apiKey').value;
             const modelsStr = document.getElementById('discoveredModels').value;
+            const isEditMode = document.getElementById('isEditMode').value === 'true';
 
             let models = {};
             try {
@@ -809,6 +812,20 @@
             } catch (e) {
                 showMessage('模型数据解析失败', 'error');
                 return;
+            }
+
+            // 如果是编辑模式，合并已有模型和新添加的模型
+            if (isEditMode) {
+                const existingModelsStr = document.getElementById('existingModels').value;
+                let existingModels = {};
+                try {
+                    existingModels = existingModelsStr ? JSON.parse(existingModelsStr) : {};
+                } catch (e) {
+                    existingModels = {};
+                }
+
+                // 合并模型：新模型覆盖已有模型（如果 ID 相同）
+                models = { ...existingModels, ...models };
             }
 
             const providerConfig = {
@@ -847,13 +864,18 @@
             document.getElementById('baseURL').value = provider.options.baseURL;
             document.getElementById('apiKey').value = provider.options.apiKey;
 
-            // 显示已有的模型
+            // 存储已有模型到 hidden input
             if (provider.models && Object.keys(provider.models).length > 0) {
+                document.getElementById('existingModels').value = JSON.stringify(provider.models);
                 renderModelsSelection(provider.models);
+            } else {
+                document.getElementById('existingModels').value = '{}';
             }
 
+            document.getElementById('isEditMode').value = 'true';
+
             window.scrollTo({ top: 0, behavior: 'smooth' });
-            showMessage('正在编辑 ' + provider.name, 'success');
+            showMessage('正在编辑 ' + provider.name + '，添加的模型将追加到已有模型中', 'success');
         }
 
         // 删除 Provider
@@ -884,6 +906,8 @@
         function resetForm() {
             document.getElementById('providerForm').reset();
             document.getElementById('discoveredModels').value = '{}';
+            document.getElementById('existingModels').value = '{}';
+            document.getElementById('isEditMode').value = 'false';
             document.getElementById('modelsSelection').classList.remove('show');
             document.getElementById('manualInput').classList.remove('show');
             document.getElementById('manualModels').value = '';

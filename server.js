@@ -63,9 +63,47 @@ function writeConfig(config) {
 async function discoverModels(baseURL, apiKey) {
     log('INFO', '开始探查模型', { baseURL });
 
+    // 尝试多个可能的端点路径
+    const possibleEndpoints = ['/v1/models', '/models'];
+
+    for (const endpoint of possibleEndpoints) {
+        try {
+            const models = await tryDiscoverEndpoint(baseURL, apiKey, endpoint);
+            log('INFO', '探查成功', { endpoint, modelCount: Object.keys(models).length });
+            return models;
+        } catch (error) {
+            log('INFO', `端点 ${endpoint} 探查失败，尝试下一个`, { error: error.message });
+            // 继续尝试下一个端点
+        }
+    }
+
+    // 所有端点都失败
+    const error = '无法探查模型，已尝试的端点: ' + possibleEndpoints.join(', ');
+    log('ERROR', error);
+    throw new Error(error);
+}
+
+// 尝试从特定端点探查模型
+function tryDiscoverEndpoint(baseURL, apiKey, endpoint) {
     return new Promise((resolve, reject) => {
         // 确保 URL 格式正确
-        let url = baseURL.endsWith('/') ? baseURL + 'models' : baseURL + '/models';
+        let normalizedURL = baseURL.trim();
+        // 移除末尾斜杠
+        if (normalizedURL.endsWith('/')) {
+            normalizedURL = normalizedURL.slice(0, -1);
+        }
+
+        // 检查是否已经包含版本路径
+        const hasVersionPath = /\/v\d+$/.test(normalizedURL);
+
+        let url;
+        if (hasVersionPath) {
+            // 如果已经有版本路径，直接添加 /models
+            url = normalizedURL + '/models';
+        } else {
+            // 否则添加完整的端点路径
+            url = normalizedURL + endpoint;
+        }
 
         // 处理 http 和 https
         const client = url.startsWith('https') ? https : http;
@@ -89,6 +127,7 @@ async function discoverModels(baseURL, apiKey) {
             res.on('end', () => {
                 try {
                     log('INFO', 'API 响应', {
+                        url,
                         statusCode: res.statusCode,
                         dataPreview: data.substring(0, 200)
                     });
@@ -96,7 +135,7 @@ async function discoverModels(baseURL, apiKey) {
                     // 检查响应状态码
                     if (res.statusCode !== 200) {
                         const error = `API 返回错误状态码: ${res.statusCode}`;
-                        log('ERROR', error, { fullResponse: data });
+                        log('INFO', error, { fullResponse: data });
                         reject(new Error(error));
                         return;
                     }
@@ -125,15 +164,14 @@ async function discoverModels(baseURL, apiKey) {
                         });
                     } else {
                         const error = 'API 返回格式不符合预期';
-                        log('ERROR', error, { parsedData: parsed });
+                        log('INFO', error, { parsedData: parsed });
                         reject(new Error(error));
                         return;
                     }
 
-                    log('INFO', '探查成功', { modelCount: Object.keys(models).length, models });
                     resolve(models);
                 } catch (error) {
-                    log('ERROR', '解析模型数据失败', {
+                    log('INFO', '解析模型数据失败', {
                         error: error.message,
                         rawData: data.substring(0, 1000)
                     });
@@ -141,7 +179,7 @@ async function discoverModels(baseURL, apiKey) {
                 }
             });
         }).on('error', (error) => {
-            log('ERROR', '请求失败', { error: error.message });
+            log('INFO', '请求失败', { error: error.message });
             reject(new Error('请求失败: ' + error.message));
         });
     });
