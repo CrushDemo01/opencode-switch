@@ -459,12 +459,14 @@
             list.innerHTML = Object.entries(providers).map(([id, provider]) => {
                 const modelCount = Object.keys(provider.models || {}).length;
                 const modelNames = Object.keys(provider.models || {}).join(', ');
+                const options = provider.options || {};
+                const apiKey = options.apiKey || '';
 
                 return `
                     <div class="provider-card">
                         <div class="provider-header">
                             <div>
-                                <span class="provider-name">${provider.name}</span>
+                                <span class="provider-name">${provider.name || id}</span>
                                 <span class="models-badge">${modelCount} 个模型</span>
                             </div>
                             <div>
@@ -474,8 +476,8 @@
                             </div>
                         </div>
                         <div class="provider-info"><strong>ID:</strong> ${id}</div>
-                        <div class="provider-info"><strong>Base URL:</strong> ${provider.options.baseURL}</div>
-                        <div class="provider-info"><strong>API Key:</strong> ${provider.options.apiKey.substring(0, 20)}...</div>
+                        <div class="provider-info"><strong>Base URL:</strong> ${options.baseURL || '未设置'}</div>
+                        <div class="provider-info"><strong>API Key:</strong> ${apiKey ? apiKey.substring(0, 20) + '...' : '未设置'}</div>
                         ${modelCount > 0 ? `<div class="provider-info"><strong>模型:</strong> ${modelNames}</div>` : ''}
                     </div>
                 `;
@@ -487,6 +489,12 @@
             const provider = config.provider[id];
             if (!provider || !provider.models) {
                 showMessage('Provider 配置不完整', 'error');
+                return;
+            }
+
+            const options = provider.options || {};
+            if (!options.baseURL || !options.apiKey) {
+                showMessage('Provider 缺少 baseURL 或 apiKey 配置', 'error');
                 return;
             }
 
@@ -510,8 +518,8 @@
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            baseURL: provider.options.baseURL,
-                            apiKey: provider.options.apiKey,
+                            baseURL: (provider.options || {}).baseURL,
+                            apiKey: (provider.options || {}).apiKey,
                             modelId: modelId
                         })
                     });
@@ -859,10 +867,11 @@
         // 编辑 Provider
         function editProvider(id) {
             const provider = config.provider[id];
+            const options = provider.options || {};
             document.getElementById('providerId').value = id;
-            document.getElementById('providerName').value = provider.name;
-            document.getElementById('baseURL').value = provider.options.baseURL;
-            document.getElementById('apiKey').value = provider.options.apiKey;
+            document.getElementById('providerName').value = provider.name || '';
+            document.getElementById('baseURL').value = options.baseURL || '';
+            document.getElementById('apiKey').value = options.apiKey || '';
 
             // 存储已有模型到 hidden input
             if (provider.models && Object.keys(provider.models).length > 0) {

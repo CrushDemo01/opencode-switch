@@ -1,26 +1,47 @@
 {
   "name": "opencode-switch",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "可视化配置管理工具，用于管理 OpenCode AI Provider 配置",
-  "main": "server.js",
+  "main": "src/server/index.js",
   "bin": {
     "opencode-switch": "./bin/opencode-switch.js",
     "ocs": "./bin/opencode-switch.js"
   },
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js"
+    "start": "node src/server/index.js",
+    "dev": "node src/server/index.js",
+    "test": "jest --coverage",
+    "test:watch": "jest --watch",
+    "lint": "eslint src/",
+    "format": "prettier --write src/"
   },
   "keywords": [
     "opencode",
     "config",
     "manager",
     "ai",
-    "provider"
+    "provider",
+    "openai",
+    "claude"
   ],
   "author": "",
   "license": "MIT",
   "engines": {
-    "node": ">=14.0.0"
+    "node": ">=16.0.0"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "eslint": "^8.57.0",
+    "prettier": "^3.2.5",
+    "supertest": "^6.3.4"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "coverageDirectory": "coverage",
+    "collectCoverageFrom": [
+      "src/**/*.js",
+      "!src/public/**"
+    ]
   }
 }

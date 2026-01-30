@@ -22,3 +22,10 @@ Thumbs.db
 
 # Test configs
 test-*.json
+
+# Coverage
+coverage/
+
+# Temp files
+*.tmp
+.cache/
